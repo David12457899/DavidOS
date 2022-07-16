@@ -9,22 +9,8 @@ _start:
 start:
     jmp 0x7c0:step2
 
-hanle_zero:
-    mov ah, 0eh
-    mov al, 'A'
-    mov bx, 0x00
-    int 0x10
-    iret
-
-hanle_one:
-    mov ah, 0eh
-    mov al, 'B'
-    mov bx, 0x00
-    int 0x10
-    iret
 
 step2:
-    helloWorld db "Tomer Ha Gever!"
     cli ; Clear interrupts, so there won't be any while we change the segments
     mov ax, 0x7c0
     mov ds, ax
@@ -34,45 +20,47 @@ step2:
     mov sp, 0x7c00
     sti ; Enable interrupts
 
-    mov word[ss:00], hanle_zero
-    mov word[ss:02], 0x7c0
+    ; Reading sector 2
+    mov ah, 02h
+    mov al, 1
+    mov ch, 0
+    mov cl, 2
+    mov dh, 0
+    mov bx, buffer
+    int 0x13
+    jc error
 
-    mov word[ss:04], hanle_one
-    mov word[ss:06], 0x7c0
-
-    int 1
-
-    push helloWorld
+    mov si, buffer
     call print
 
     jmp $
-    jmp end
+
+error:
+    mov si, error_message
+    call print
+    jmp $
 
 print:
-    mov bp, sp
-    push bp
-    pusha
+    .loop:
+        mov bx, 0
+        lodsb
+        cmp al, 0
+        je .done
+        call print_char
+        jmp .loop
 
-    mov ah, 0eh
-    mov bx, 0
+    .done:
+        ret
 
-    mov cx, 15
-    mov si, [bp + 2]
-
-    loopy_loop:
-
-        mov al, [si]
+    print_char:
+        mov ah, 0eh
         int 0x10
+        ret
 
-        inc si
-        loop loopy_loop
+error_message: db 'failed to load sector', 0
 
-    popa
-    mov sp, bp
-    pop bp
-    ret
+times 510-($ - $$) db 0 ; 510 - (current address - beginning address)
+dw 0xAA55
 
-end:
-    times 510-($ - $$) db 01 ; 510 - (current address - beginning address)
-    dw 0xAA55
+buffer: 
 
